@@ -42,8 +42,7 @@ class Main:
     def render(self):
         self.screen.fill(gray(127))
 
-        print(np.max(self.space_image))
-        image = image_from_np2d(self.space_image.real, RENDER_SIZE)
+        image = image_from_np2d(self.space_image.real, RENDER_SIZE, normalize=True)
         self.screen.blit(image, IMAGE_RECT)
 
         frequency_image1 = image_from_np2d(self.frequency_space.real, RENDER_SIZE)
@@ -51,6 +50,8 @@ class Main:
 
         frequency_image2 = image_from_np2d(self.frequency_space.imag, RENDER_SIZE)
         self.screen.blit(frequency_image2, FREQUENCY_IMAGE_RECT2)
+
+        print(np.max(self.frequency_space))
 
         pg.display.update()
 
@@ -68,6 +69,16 @@ class Main:
         if event.type == pg.MOUSEMOTION:
             if self.drawing:
                 self.flip_point(event.pos)
+        if event.type == pg.KEYDOWN:
+            if event.unicode == 's':
+                frequency = 2
+                self.space_image = np.cos(
+                    np.linspace(0, 2*np.pi * frequency, IMAGE_SIZE)
+                    .repeat(IMAGE_SIZE)
+                    .reshape(IMAGE_SIZE, IMAGE_SIZE)
+                )
+                self.update_frequencies()
+                self.update_needed = True
         else:
             # print(event)
             pass
@@ -81,6 +92,8 @@ class Main:
                 rect_index = i
                 rect = r
                 break
+        if rect is None:
+            return
         rect_top_left = np.array(rect.topleft)
         mouse_pos = np.array(pos)
         index = ((mouse_pos - rect_top_left) * (IMAGE_SIZE / RENDER_SIZE)).astype(int)
@@ -101,13 +114,19 @@ class Main:
             imag_cpy[index] = 1 - imag_cpy[index]
             self.frequency_space.imag = imag_cpy
         if rect_index == 0:
-            self.frequency_space = scipy.fft.fft2(self.space_image)
+            self.update_frequencies()
         elif rect_index in (1, 2):
-            self.space_image = scipy.fft.ifft2(self.frequency_space)
+            self.update_space()
         self.update_needed = True
 
+    def update_space(self):
+        self.space_image = scipy.fft.ifft2(self.frequency_space)
 
-def image_from_np2d(a, scale_shape):
+    def update_frequencies(self):
+        self.frequency_space = scipy.fft.fft2(self.space_image)
+
+
+def image_from_np2d(a, scale_shape, normalize=False):
     if isinstance(scale_shape, int):
         scale_shape = (scale_shape,) * 2
     a = a.real
@@ -115,8 +134,8 @@ def image_from_np2d(a, scale_shape):
     if mini < 0:
         a = a - np.min(a)
     maxi = np.max(a)
-    if maxi > 1:
-        a /= np.max(a)
+    if maxi > 1 or (normalize and maxi != 0):
+        a /= maxi
     a = a * 255
     shape = a.shape
     a = np.repeat(a, 3, axis=-1).reshape(*shape, 3)
@@ -132,4 +151,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
