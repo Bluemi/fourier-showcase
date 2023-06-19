@@ -75,7 +75,7 @@ class Main:
             self.last_flipped_index = None
         if event.type == pg.MOUSEMOTION:
             if self.drawing:
-                self.flip_point(event.pos)
+                self.flip_point(event.pos, False)
         if event.type == pg.KEYDOWN:
             if event.unicode == 's':
                 self.frequency_vert += 1
@@ -122,7 +122,7 @@ class Main:
         self.update_frequencies()
         self.update_needed = True
 
-    def flip_point(self, pos):
+    def flip_point(self, pos, choose_value=True):
         rects = [IMAGE_RECT, FREQUENCY_IMAGE_RECT1, FREQUENCY_IMAGE_RECT2]
         rect_index = -1
         rect = None
@@ -145,12 +145,12 @@ class Main:
 
         # mutate image
         if rect_index == 0:
-            if abs(self.space_image[index]) < 0.00001:
+            if choose_value and abs(self.space_image[index]) < 0.00001:
                 self.space_image[index] = 1
             else:
                 self.space_image[index] = 0
         elif rect_index in (1, 2):
-            if abs(self.frequency_space[index]) < 0.00001:
+            if choose_value and abs(self.frequency_space[index]) < 0.00001:
                 if self.transform_index == 0:
                     self.frequency_space[index] = IMAGE_SIZE**2 + IMAGE_SIZE**2*1j
                 elif self.transform_index == 1:
