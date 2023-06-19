@@ -2,6 +2,7 @@ import pygame as pg
 import numpy as np
 import scipy.fft
 
+from image_loader import ImageLoader
 
 IMAGE_SIZE = 100
 IMAGE_SHAPE = (IMAGE_SIZE,) * 2
@@ -27,8 +28,12 @@ class Main:
         self.frequency_space = np.zeros(IMAGE_SHAPE, dtype=complex)
         self.update_needed = True
 
+        self.frequency_vert = 0
+        self.frequency_hori = 0
+
         self.drawing = False
         self.last_flipped_index = None
+        self.image_loader = ImageLoader(IMAGE_SHAPE)
 
     def run(self):
         while self.running:
@@ -51,7 +56,7 @@ class Main:
         frequency_image2 = image_from_np2d(self.frequency_space.imag, RENDER_SIZE)
         self.screen.blit(frequency_image2, FREQUENCY_IMAGE_RECT2)
 
-        print(np.max(self.frequency_space))
+        # print(np.max(self.frequency_space))
 
         pg.display.update()
 
@@ -59,8 +64,6 @@ class Main:
         if event.type == pg.QUIT:
             self.running = False
         if event.type == pg.MOUSEBUTTONDOWN:
-            # print(self.frequency_space.flags)
-            # print(np.imag(self.frequency_space).copy().flags)
             self.flip_point(event.pos)
             self.drawing = True
         if event.type == pg.MOUSEBUTTONUP:
@@ -71,17 +74,42 @@ class Main:
                 self.flip_point(event.pos)
         if event.type == pg.KEYDOWN:
             if event.unicode == 's':
-                frequency = 2
-                self.space_image = np.cos(
-                    np.linspace(0, 2*np.pi * frequency, IMAGE_SIZE)
-                    .repeat(IMAGE_SIZE)
-                    .reshape(IMAGE_SIZE, IMAGE_SIZE)
-                )
+                self.frequency_vert += 1
+                print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
+                self.generate_image_with_frequency()
+            elif event.unicode == 'S':
+                self.frequency_vert -= 1
+                print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
+                self.generate_image_with_frequency()
+            if event.unicode == 'd':
+                self.frequency_hori += 1
+                print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
+                self.generate_image_with_frequency()
+            elif event.unicode == 'D':
+                self.frequency_hori -= 1
+                print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
+                self.generate_image_with_frequency()
+            elif event.unicode == 'i':
+                self.space_image = self.image_loader.next_image()
+                self.update_frequencies()
+                self.update_needed = True
+            elif event.unicode == 'I':
+                self.space_image = self.image_loader.prev_image()
                 self.update_frequencies()
                 self.update_needed = True
         else:
             # print(event)
             pass
+
+    def generate_image_with_frequency(self):
+        lin_space = np.linspace(np.pi / 2, 2 * np.pi + np.pi / 2, IMAGE_SIZE)\
+            .repeat(IMAGE_SIZE)\
+            .reshape(IMAGE_SIZE, IMAGE_SIZE)
+        space_image = np.sin(lin_space * self.frequency_vert) + np.sin(lin_space.T * self.frequency_hori)
+
+        self.space_image = (space_image + 1) / 2
+        self.update_frequencies()
+        self.update_needed = True
 
     def flip_point(self, pos):
         rects = [IMAGE_RECT, FREQUENCY_IMAGE_RECT1, FREQUENCY_IMAGE_RECT2]
@@ -106,13 +134,16 @@ class Main:
 
         # mutate image
         if rect_index == 0:
-            self.space_image[index] = 1 - self.space_image[index]
-        elif rect_index == 1:
-            self.frequency_space.real[index] = 1 - self.frequency_space.real[index]
-        elif rect_index == 2:
-            imag_cpy = np.imag(self.frequency_space).copy()
-            imag_cpy[index] = 1 - imag_cpy[index]
-            self.frequency_space.imag = imag_cpy
+            if abs(self.space_image[index]) < 0.00001:
+                self.space_image[index] = 1
+            else:
+                self.space_image[index] = 0
+        elif rect_index in (1, 2):
+            if abs(self.frequency_space[index]) < 0.00001:
+                self.frequency_space[index] = IMAGE_SIZE**2 + IMAGE_SIZE**2j
+            else:
+                self.frequency_space[index] = 0
+
         if rect_index == 0:
             self.update_frequencies()
         elif rect_index in (1, 2):
@@ -120,10 +151,10 @@ class Main:
         self.update_needed = True
 
     def update_space(self):
-        self.space_image = scipy.fft.ifft2(self.frequency_space)
+        self.space_image = (scipy.fft.ifft2(self.frequency_space) + 1) / 2
 
     def update_frequencies(self):
-        self.frequency_space = scipy.fft.fft2(self.space_image)
+        self.frequency_space = scipy.fft.fft2(self.space_image * 2 - 1)
 
 
 def image_from_np2d(a, scale_shape, normalize=False):
