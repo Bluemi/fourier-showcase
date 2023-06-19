@@ -26,6 +26,7 @@ class Main:
         self.screen = pg.display.set_mode(DEFAULT_SCREEN_SIZE)
         self.space_image = np.zeros(IMAGE_SHAPE)
         self.frequency_space = np.zeros(IMAGE_SHAPE, dtype=complex)
+        self.update_frequencies()
         self.update_needed = True
 
         self.frequency_vert = 0
@@ -102,7 +103,7 @@ class Main:
             pass
 
     def generate_image_with_frequency(self):
-        lin_space = np.linspace(np.pi / 2, 2 * np.pi + np.pi / 2, IMAGE_SIZE)\
+        lin_space = np.linspace(0, 2 * np.pi, IMAGE_SIZE)\
             .repeat(IMAGE_SIZE)\
             .reshape(IMAGE_SIZE, IMAGE_SIZE)
         space_image = np.sin(lin_space * self.frequency_vert) + np.sin(lin_space.T * self.frequency_hori)
@@ -140,7 +141,7 @@ class Main:
                 self.space_image[index] = 0
         elif rect_index in (1, 2):
             if abs(self.frequency_space[index]) < 0.00001:
-                self.frequency_space[index] = IMAGE_SIZE**2 + IMAGE_SIZE**2j
+                self.frequency_space[index] = IMAGE_SIZE**2 + IMAGE_SIZE**2*1j
             else:
                 self.frequency_space[index] = 0
 
