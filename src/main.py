@@ -15,6 +15,8 @@ FREQUENCY_IMAGE_RECT2 = FREQUENCY_IMAGE_RECT1.move(RENDER_SIZE + BORDER, 0)
 
 DEFAULT_SCREEN_SIZE = np.array([BORDER + (RENDER_SIZE + BORDER)*3 + BORDER, RENDER_SIZE+BORDER*2])
 
+TRANSFORMS = ['fft', 'dct']
+
 
 def gray(b):
     return pg.Color(b, b, b)
@@ -23,6 +25,7 @@ def gray(b):
 class Main:
     def __init__(self):
         self.running = True
+        self.transform_index = 0
         self.screen = pg.display.set_mode(DEFAULT_SCREEN_SIZE)
         self.space_image = np.zeros(IMAGE_SHAPE)
         self.frequency_space = np.zeros(IMAGE_SHAPE, dtype=complex)
@@ -98,6 +101,10 @@ class Main:
                 self.space_image = self.image_loader.prev_image()
                 self.update_frequencies()
                 self.update_needed = True
+            elif event.unicode == 'n':
+                self.transform_index = (self.transform_index + 1) % len(TRANSFORMS)
+                self.update_frequencies()
+                self.update_needed = True
         else:
             # print(event)
             pass
@@ -141,7 +148,12 @@ class Main:
                 self.space_image[index] = 0
         elif rect_index in (1, 2):
             if abs(self.frequency_space[index]) < 0.00001:
-                self.frequency_space[index] = IMAGE_SIZE**2 + IMAGE_SIZE**2*1j
+                if self.transform_index == 0:
+                    self.frequency_space[index] = IMAGE_SIZE**2 + IMAGE_SIZE**2*1j
+                elif self.transform_index == 1:
+                    self.frequency_space[index] = IMAGE_SIZE ** 2
+                else:
+                    raise ValueError('Unknown transform with index: ', self.transform_index)
             else:
                 self.frequency_space[index] = 0
 
@@ -152,10 +164,22 @@ class Main:
         self.update_needed = True
 
     def update_space(self):
-        self.space_image = (scipy.fft.ifft2(self.frequency_space) + 1) / 2
+        if self.transform_index == 0:
+            space_image = scipy.fft.ifft2(self.frequency_space)
+        elif self.transform_index == 1:
+            space_image = scipy.fft.idct(self.frequency_space)
+        else:
+            raise ValueError('Unknown transform with index: ', self.transform_index)
+        self.space_image = (space_image + 1) / 2
 
     def update_frequencies(self):
-        self.frequency_space = scipy.fft.fft2(self.space_image * 2 - 1)
+        space_image = self.space_image * 2 - 1
+        if self.transform_index == 0:
+            self.frequency_space = scipy.fft.fft2(space_image)
+        elif self.transform_index == 1:
+            self.frequency_space = scipy.fft.dct(space_image)
+        else:
+            raise ValueError('Unknown transform with index: ', self.transform_index)
 
 
 def image_from_np2d(a, scale_shape, normalize=False):
