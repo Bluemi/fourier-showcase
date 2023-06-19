@@ -105,6 +105,9 @@ class Main:
                 self.transform_index = (self.transform_index + 1) % len(TRANSFORMS)
                 self.update_frequencies()
                 self.update_needed = True
+                print(f'Using {TRANSFORMS[self.transform_index]}')
+            elif event.key == 27:
+                self.running = False
         else:
             # print(event)
             pass
