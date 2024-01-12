@@ -98,8 +98,8 @@ class Main:
     def draw_1d_samples(self, samples, left, color):
         y_line = BORDER + RENDER_SIZE / 2  # y-pos of h-line
         y_positions = y_line - (samples * RENDER_SCALE_1D)  # y-positions of samples
-        sample_width = 20
         n_samples = len(samples)
+        sample_width = int((RENDER_SIZE / n_samples) * 0.3)
         x_positions = (np.linspace(0, RENDER_SIZE, n_samples,
                                    endpoint=False) + left + RENDER_SIZE / n_samples / 2).round().astype(int)
         for x, y in zip(x_positions, y_positions):
@@ -157,6 +157,20 @@ class Main:
             elif event.type == pg.MOUSEMOTION:
                 if self.dragging:
                     self.handle_all_mouse_1d(event.pos)
+            elif event.type == pg.KEYDOWN:
+                if event.key == pg.K_PLUS:
+                    samples_to_add = int(round(len(self.samples) * 0.2))
+                    samples_to_add = max(samples_to_add, 1)
+                    new_samples = np.zeros(samples_to_add, dtype=complex)
+                    self.samples = np.concatenate([self.samples, new_samples])
+                    self.update_frequencies_from_samples_1d()
+                    self.update_needed = True
+                if event.key == pg.K_MINUS:
+                    new_size = len(self.samples) * (1 / 1.2)
+                    new_size = int(max(min(new_size, len(self.samples)-1), 1))
+                    self.samples = self.samples[:new_size]
+                    self.update_frequencies_from_samples_1d()
+                    self.update_needed = True
         elif self.mode == '2':
             if event.type == pg.MOUSEBUTTONDOWN:
                 self.flip_point(event.pos)
