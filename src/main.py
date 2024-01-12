@@ -4,6 +4,8 @@ import scipy.fft
 
 from image_loader import ImageLoader
 
+RENDER_SCALE_1D = 10
+
 IMAGE_SIZE = 100
 IMAGE_SHAPE = (IMAGE_SIZE,) * 2
 
@@ -25,6 +27,15 @@ def gray(b):
 class Main:
     def __init__(self):
         self.running = True
+        self.mode = '1'
+
+        # mode 1
+        self.samples = np.zeros((10,), dtype=complex)
+        self.spectrum = np.fft.fft(self.samples)
+
+        self.dragging = False
+
+        # mode 2
         self.transform_index = 0
         self.screen = pg.display.set_mode(DEFAULT_SCREEN_SIZE)
         self.space_image = np.zeros(IMAGE_SHAPE)
@@ -51,65 +62,146 @@ class Main:
     def render(self):
         self.screen.fill(gray(127))
 
-        image = image_from_np2d(self.space_image.real, RENDER_SIZE, normalize=True)
-        self.screen.blit(image, IMAGE_RECT)
+        if self.mode == '1':
+            self.render_1d()
+        elif self.mode == '2':
+            image = image_from_np2d(self.space_image.real, RENDER_SIZE, normalize=True)
+            self.screen.blit(image, IMAGE_RECT)
 
-        frequency_image1 = image_from_np2d(self.frequency_space.real, RENDER_SIZE)
-        self.screen.blit(frequency_image1, FREQUENCY_IMAGE_RECT1)
+            frequency_image1 = image_from_np2d(self.frequency_space.real, RENDER_SIZE)
+            self.screen.blit(frequency_image1, FREQUENCY_IMAGE_RECT1)
 
-        frequency_image2 = image_from_np2d(self.frequency_space.imag, RENDER_SIZE)
-        self.screen.blit(frequency_image2, FREQUENCY_IMAGE_RECT2)
-
-        # print(np.max(self.frequency_space))
+            frequency_image2 = image_from_np2d(self.frequency_space.imag, RENDER_SIZE)
+            self.screen.blit(frequency_image2, FREQUENCY_IMAGE_RECT2)
 
         pg.display.update()
+
+    def render_1d(self):
+        # render samples
+        pg.draw.rect(self.screen, gray(70), IMAGE_RECT)  # draw background
+        y_line = BORDER + RENDER_SIZE / 2  # y-pos of h-line
+        pg.draw.line(self.screen, gray(90), (BORDER, y_line), (BORDER+RENDER_SIZE, y_line))
+        self.draw_1d_samples(self.samples.real, BORDER, gray(20))
+
+        # render real part
+        left = FREQUENCY_IMAGE_RECT1.left
+        pg.draw.rect(self.screen, gray(70), FREQUENCY_IMAGE_RECT1)  # draw background
+        pg.draw.line(self.screen, gray(90), (left, y_line), (left+RENDER_SIZE, y_line))
+        self.draw_1d_samples(self.spectrum.real, left, gray(20))
+
+        # render imaginary part
+        left = FREQUENCY_IMAGE_RECT2.left
+        pg.draw.rect(self.screen, gray(70), FREQUENCY_IMAGE_RECT2)  # draw background
+        pg.draw.line(self.screen, gray(90), (left, y_line), (left+RENDER_SIZE, y_line))
+        self.draw_1d_samples(self.spectrum.imag, left, gray(20))
+
+    def draw_1d_samples(self, samples, left, color):
+        y_line = BORDER + RENDER_SIZE / 2  # y-pos of h-line
+        y_positions = y_line - (samples * RENDER_SCALE_1D)  # y-positions of samples
+        sample_width = 20
+        n_samples = len(samples)
+        x_positions = (np.linspace(0, RENDER_SIZE, n_samples,
+                                   endpoint=False) + left + RENDER_SIZE / n_samples / 2).round().astype(int)
+        for x, y in zip(x_positions, y_positions):
+            pg.draw.line(self.screen, color, (x - sample_width, y), (x + sample_width, y), width=3)
+            pg.draw.line(self.screen, color, (x, y_line), (x, y), width=3)
+
+    def handle_mouse_1d(self, pos, rect, samples_to_update):
+        if rect.collidepoint(pos):
+            x_pos = pos[0] - rect.left
+            n_samples = len(self.samples)
+            x_positions = (np.linspace(0, RENDER_SIZE, n_samples, endpoint=False) + RENDER_SIZE / n_samples / 2).round().astype(int)
+            x_index = np.argmin(np.abs(x_positions - x_pos))
+
+            y_pos = ((BORDER + RENDER_SIZE / 2) - pos[1]) / RENDER_SCALE_1D
+            samples_to_update[x_index] = y_pos
+
+            return True
+        return False
+
+    def handle_all_mouse_1d(self, pos):
+        if self.handle_mouse_1d(pos, IMAGE_RECT, self.samples.real):
+            self.update_frequencies_from_samples_1d()
+            self.update_needed = True
+
+        if self.handle_mouse_1d(pos, FREQUENCY_IMAGE_RECT1, self.spectrum.real):
+            self.update_samples_from_frequencies_1d()
+            self.update_needed = True
+
+        if self.handle_mouse_1d(pos, FREQUENCY_IMAGE_RECT2, self.spectrum.imag):
+            self.update_samples_from_frequencies_1d()
+            self.update_needed = True
+
+    def update_frequencies_from_samples_1d(self):
+        self.spectrum = np.fft.fft(self.samples)
+
+    def update_samples_from_frequencies_1d(self):
+        self.samples = np.fft.ifft(self.spectrum)
 
     def handle_event(self, event):
         if event.type == pg.QUIT:
             self.running = False
-        if event.type == pg.MOUSEBUTTONDOWN:
-            self.flip_point(event.pos)
-            self.drawing = True
-        if event.type == pg.MOUSEBUTTONUP:
-            self.drawing = False
-            self.last_flipped_index = None
-        if event.type == pg.MOUSEMOTION:
-            if self.drawing:
-                self.flip_point(event.pos, False)
         if event.type == pg.KEYDOWN:
-            if event.unicode == 's':
-                self.frequency_vert += 1
-                print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
-                self.generate_image_with_frequency()
-            elif event.unicode == 'S':
-                self.frequency_vert -= 1
-                print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
-                self.generate_image_with_frequency()
-            if event.unicode == 'd':
-                self.frequency_hori += 1
-                print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
-                self.generate_image_with_frequency()
-            elif event.unicode == 'D':
-                self.frequency_hori -= 1
-                print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
-                self.generate_image_with_frequency()
-            elif event.unicode == 'i':
-                self.space_image = self.image_loader.next_image()
-                self.update_frequencies()
+            if event.key == pg.K_1:
+                self.mode = '1'
                 self.update_needed = True
-            elif event.unicode == 'I':
-                self.space_image = self.image_loader.prev_image()
-                self.update_frequencies()
+            elif event.key == pg.K_2:
+                self.mode = '2'
                 self.update_needed = True
-            elif event.unicode == 'n':
-                self.transform_index = (self.transform_index + 1) % len(TRANSFORMS)
-                self.update_frequencies()
+        if self.mode == '1':
+            if event.type == pg.MOUSEBUTTONDOWN:
+                self.dragging = True
+                self.handle_all_mouse_1d(event.pos)
+            elif event.type == pg.MOUSEBUTTONUP:
+                self.dragging = False
+            elif event.type == pg.MOUSEMOTION:
+                if self.dragging:
+                    self.handle_all_mouse_1d(event.pos)
+        elif self.mode == '2':
+            if event.type == pg.MOUSEBUTTONDOWN:
+                self.flip_point(event.pos)
+                self.drawing = True
+            if event.type == pg.MOUSEBUTTONUP:
+                self.drawing = False
+                self.last_flipped_index = None
+            if event.type == pg.MOUSEMOTION:
+                if self.drawing:
+                    self.flip_point(event.pos, False)
+            if event.type == pg.KEYDOWN:
+                if event.unicode == 's':
+                    self.frequency_vert += 1
+                    print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
+                    self.generate_image_with_frequency()
+                elif event.unicode == 'S':
+                    self.frequency_vert -= 1
+                    print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
+                    self.generate_image_with_frequency()
+                if event.unicode == 'd':
+                    self.frequency_hori += 1
+                    print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
+                    self.generate_image_with_frequency()
+                elif event.unicode == 'D':
+                    self.frequency_hori -= 1
+                    print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
+                    self.generate_image_with_frequency()
+                elif event.unicode == 'i':
+                    self.space_image = self.image_loader.next_image()
+                    self.update_frequencies()
+                    self.update_needed = True
+                elif event.unicode == 'I':
+                    self.space_image = self.image_loader.prev_image()
+                    self.update_frequencies()
+                    self.update_needed = True
+                elif event.unicode == 'n':
+                    self.transform_index = (self.transform_index + 1) % len(TRANSFORMS)
+                    self.update_frequencies()
+                    self.update_needed = True
+                    print(f'Using {TRANSFORMS[self.transform_index]}')
+                elif event.key == 27:
+                    self.running = False
+            else:
                 self.update_needed = True
-                print(f'Using {TRANSFORMS[self.transform_index]}')
-            elif event.key == 27:
-                self.running = False
-        else:
-            # print(event)
+        elif self.mode == '1':
             pass
 
     def generate_image_with_frequency(self):
