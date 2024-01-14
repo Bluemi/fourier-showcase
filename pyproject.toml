@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "fourier-showcase"
+version = "0.1.0"
+description = "A small utility program in Python (pygame + numpy) to visualize the concept of the fourier transformation."
+authors = ["Bluemi <bruno.schilling@protonmail.ch>"]
+license = "GPL-3.0-or-later"
+readme = "README.md"
+packages = [{include = "fourier_showcase"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+numpy = "^1.24.1"
+pygame = "^2.5.0"
+scipy = "^1.11.3"
+pillow = "^10.2.0"
+
+[tool.poetry.scripts]
+fourier_showcase = "fourier_showcase.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

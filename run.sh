@@ -1,3 +1,4 @@
 #!/bin/bash
 
-python3 ./src/main.py
+poetry run fourier_showcase/main.py
+

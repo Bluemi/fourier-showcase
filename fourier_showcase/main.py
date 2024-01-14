@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import pygame as pg
 import numpy as np
 from scipy.fft import fft2, dct, idct, ifft2
