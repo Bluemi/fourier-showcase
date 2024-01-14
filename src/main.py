@@ -33,7 +33,9 @@ class Main:
         # mode 1
         self.samples = np.zeros((10,), dtype=complex)
         self.spectrum = np.fft.fft(self.samples)
+
         self.show_imaginary = False
+        self.frequency = 0
 
         self.dragging = False
         self.last_mouse_button = None
@@ -198,6 +200,18 @@ class Main:
                     self.samples = np.zeros((len(self.samples),), dtype=complex)
                     self.update_frequencies_from_samples_1d()
                     self.update_needed = True
+                elif event.key == pg.K_c:
+                    self.frequency += -1 if pg.key.get_mods() & pg.KMOD_SHIFT else 1
+                    space = np.linspace(0, 2.0*np.pi, len(self.samples), endpoint=False, dtype=complex)
+                    self.samples = np.cos(space * self.frequency) * 4.0
+                    self.update_frequencies_from_samples_1d()
+                    self.update_needed = True
+                elif event.key == pg.K_s:
+                    self.frequency += -1 if pg.key.get_mods() & pg.KMOD_SHIFT else 1
+                    space = np.linspace(0, 2.0 * np.pi, len(self.samples), endpoint=False, dtype=complex)
+                    self.samples = np.sin(space * self.frequency) * 4.0
+                    self.update_frequencies_from_samples_1d()
+                    self.update_needed = True
         elif self.mode == '2':
             if event.type == pg.MOUSEBUTTONDOWN:
                 self.flip_point(event.pos)
@@ -337,6 +351,7 @@ def image_from_np2d(a, scale_shape, normalize=False):
 
 def main():
     pg.init()
+    pg.key.set_repeat(130, 25)
     main_instance = Main()
     main_instance.run()
 
