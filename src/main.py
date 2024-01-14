@@ -1,6 +1,6 @@
 import pygame as pg
 import numpy as np
-import scipy.fft
+from scipy.fft import fft2, dct, idct, ifft2
 
 from image_loader import ImageLoader
 
@@ -15,7 +15,8 @@ IMAGE_RECT = pg.Rect(BORDER, BORDER, RENDER_SIZE, RENDER_SIZE)
 FREQUENCY_IMAGE_RECT1 = IMAGE_RECT.move(RENDER_SIZE + BORDER, 0)
 FREQUENCY_IMAGE_RECT2 = FREQUENCY_IMAGE_RECT1.move(RENDER_SIZE + BORDER, 0)
 
-DEFAULT_SCREEN_SIZE = np.array([BORDER + (RENDER_SIZE + BORDER)*2, RENDER_SIZE+BORDER*2])
+DEFAULT_SCREEN_SIZE_1D = np.array([BORDER + (RENDER_SIZE + BORDER) * 2, RENDER_SIZE + BORDER * 2])
+DEFAULT_SCREEN_SIZE_2D = np.array([BORDER + (RENDER_SIZE + BORDER) * 3, RENDER_SIZE+BORDER*2])
 
 TRANSFORMS = ['fft', 'dct']
 
@@ -39,7 +40,7 @@ class Main:
 
         # mode 2
         self.transform_index = 0
-        self.screen = pg.display.set_mode(DEFAULT_SCREEN_SIZE)
+        self.screen = pg.display.set_mode(DEFAULT_SCREEN_SIZE_1D)
         self.space_image = np.zeros(IMAGE_SHAPE)
         self.frequency_space = np.zeros(IMAGE_SHAPE, dtype=complex)
         self.update_frequencies()
@@ -115,7 +116,9 @@ class Main:
         if rect.collidepoint(pos):
             x_pos = pos[0] - rect.left
             n_samples = len(self.samples)
-            x_positions = (np.linspace(0, RENDER_SIZE, n_samples, endpoint=False) + RENDER_SIZE / n_samples / 2).round().astype(int)
+            x_positions = (
+                    np.linspace(0, RENDER_SIZE, n_samples, endpoint=False) + RENDER_SIZE / n_samples / 2
+            ).round().astype(int)
             x_index = np.argmin(np.abs(x_positions - x_pos))
 
             y_pos = ((BORDER + RENDER_SIZE / 2) - pos[1]) / RENDER_SCALE_1D
@@ -157,9 +160,11 @@ class Main:
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_1:
                 self.mode = '1'
+                pg.display.set_mode(DEFAULT_SCREEN_SIZE_1D)
                 self.update_needed = True
             elif event.key == pg.K_2:
                 self.mode = '2'
+                pg.display.set_mode(DEFAULT_SCREEN_SIZE_2D)
                 self.update_needed = True
         if self.mode == '1':
             if event.type == pg.MOUSEBUTTONDOWN:
@@ -296,9 +301,9 @@ class Main:
 
     def update_space(self):
         if self.transform_index == 0:
-            space_image = scipy.fft.ifft2(self.frequency_space)
+            space_image = ifft2(self.frequency_space)
         elif self.transform_index == 1:
-            space_image = scipy.fft.idct(self.frequency_space)
+            space_image = idct(self.frequency_space)
         else:
             raise ValueError('Unknown transform with index: ', self.transform_index)
         self.space_image = (space_image + 1) / 2
@@ -306,9 +311,9 @@ class Main:
     def update_frequencies(self):
         space_image = self.space_image * 2 - 1
         if self.transform_index == 0:
-            self.frequency_space = scipy.fft.fft2(space_image)
+            self.frequency_space = fft2(space_image)
         elif self.transform_index == 1:
-            self.frequency_space = scipy.fft.dct(space_image)
+            self.frequency_space = dct(space_image)
         else:
             raise ValueError('Unknown transform with index: ', self.transform_index)
 
