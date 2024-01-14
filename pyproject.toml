@@ -11,8 +11,6 @@ packages = [{include = "fourier_showcase"}]
 python = "^3.9"
 numpy = "^1.24.1"
 pygame = "^2.5.0"
-scipy = "^1.11.3"
-pillow = "^10.2.0"
 
 [tool.poetry.scripts]
 fourier_showcase = "fourier_showcase.main:main"

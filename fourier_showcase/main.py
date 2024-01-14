@@ -3,9 +3,6 @@
 import sys
 import pygame as pg
 import numpy as np
-from scipy.fft import fft2, dct, idct, ifft2
-
-from image_loader import ImageLoader
 
 RENDER_SCALE_1D = 10
 
@@ -19,9 +16,6 @@ FREQUENCY_IMAGE_RECT1 = IMAGE_RECT.move(RENDER_SIZE + BORDER, 0)
 FREQUENCY_IMAGE_RECT2 = FREQUENCY_IMAGE_RECT1.move(RENDER_SIZE + BORDER, 0)
 
 DEFAULT_SCREEN_SIZE_1D = np.array([BORDER + (RENDER_SIZE + BORDER) * 2, RENDER_SIZE + BORDER * 2])
-DEFAULT_SCREEN_SIZE_2D = np.array([BORDER + (RENDER_SIZE + BORDER) * 3, RENDER_SIZE+BORDER*2])
-
-TRANSFORMS = ['fft', 'dct']
 
 
 def gray(b):
@@ -30,10 +24,6 @@ def gray(b):
 
 class Main:
     def __init__(self):
-        self.running = True
-        self.mode = '1'
-
-        # mode 1
         self.samples = np.zeros((10,), dtype=complex)
         self.spectrum = np.fft.fft(self.samples)
 
@@ -43,20 +33,9 @@ class Main:
         self.dragging = False
         self.last_mouse_button = None
 
-        # mode 2
-        self.transform_index = 0
         self.screen = pg.display.set_mode(DEFAULT_SCREEN_SIZE_1D)
-        self.space_image = np.zeros(IMAGE_SHAPE)
-        self.frequency_space = np.zeros(IMAGE_SHAPE, dtype=complex)
-        self.update_frequencies()
         self.update_needed = True
-
-        self.frequency_vert = 0
-        self.frequency_hori = 0
-
-        self.drawing = False
-        self.last_flipped_index = None
-        self.image_loader = ImageLoader(IMAGE_SHAPE)
+        self.running = True
 
     def run(self):
         while self.running:
@@ -69,19 +48,7 @@ class Main:
 
     def render(self):
         self.screen.fill(gray(80))
-
-        if self.mode == '1':
-            self.render_1d()
-        elif self.mode == '2':
-            image = image_from_np2d(self.space_image.real, RENDER_SIZE, normalize=True)
-            self.screen.blit(image, IMAGE_RECT)
-
-            frequency_image1 = image_from_np2d(self.frequency_space.real, RENDER_SIZE)
-            self.screen.blit(frequency_image1, FREQUENCY_IMAGE_RECT1)
-
-            frequency_image2 = image_from_np2d(self.frequency_space.imag, RENDER_SIZE)
-            self.screen.blit(frequency_image2, FREQUENCY_IMAGE_RECT2)
-
+        self.render_1d()
         pg.display.update()
 
     def render_1d(self):
@@ -162,177 +129,49 @@ class Main:
     def handle_event(self, event):
         if event.type == pg.QUIT:
             self.running = False
-        if event.type == pg.KEYDOWN:
-            if event.key == pg.K_1:
-                self.mode = '1'
-                pg.display.set_mode(DEFAULT_SCREEN_SIZE_1D)
+        elif event.type == pg.MOUSEBUTTONDOWN:
+            self.dragging = True
+            self.last_mouse_button = event.button
+            self.handle_all_mouse_1d(event.pos, event.button)
+        elif event.type == pg.MOUSEBUTTONUP:
+            self.dragging = False
+            self.last_mouse_button = None
+        elif event.type == pg.MOUSEMOTION:
+            if self.dragging:
+                self.handle_all_mouse_1d(event.pos, self.last_mouse_button)
+        elif event.type == pg.KEYDOWN:
+            if event.key == pg.K_PLUS:
+                samples_to_add = int(round(len(self.samples) * 0.2))
+                samples_to_add = max(samples_to_add, 1)
+                new_samples = np.zeros(samples_to_add, dtype=complex)
+                self.samples = np.concatenate([self.samples, new_samples])
+                self.update_frequencies_from_samples_1d()
                 self.update_needed = True
-            elif event.key == pg.K_2:
-                self.mode = '2'
-                pg.display.set_mode(DEFAULT_SCREEN_SIZE_2D)
+            elif event.key == pg.K_MINUS:
+                new_size = len(self.samples) * (1 / 1.2)
+                new_size = int(max(min(new_size, len(self.samples)-1), 1))
+                self.samples = self.samples[:new_size]
+                self.update_frequencies_from_samples_1d()
                 self.update_needed = True
-        if self.mode == '1':
-            if event.type == pg.MOUSEBUTTONDOWN:
-                self.dragging = True
-                self.last_mouse_button = event.button
-                self.handle_all_mouse_1d(event.pos, event.button)
-            elif event.type == pg.MOUSEBUTTONUP:
-                self.dragging = False
-                self.last_mouse_button = None
-            elif event.type == pg.MOUSEMOTION:
-                if self.dragging:
-                    self.handle_all_mouse_1d(event.pos, self.last_mouse_button)
-            elif event.type == pg.KEYDOWN:
-                if event.key == pg.K_PLUS:
-                    samples_to_add = int(round(len(self.samples) * 0.2))
-                    samples_to_add = max(samples_to_add, 1)
-                    new_samples = np.zeros(samples_to_add, dtype=complex)
-                    self.samples = np.concatenate([self.samples, new_samples])
-                    self.update_frequencies_from_samples_1d()
-                    self.update_needed = True
-                elif event.key == pg.K_MINUS:
-                    new_size = len(self.samples) * (1 / 1.2)
-                    new_size = int(max(min(new_size, len(self.samples)-1), 1))
-                    self.samples = self.samples[:new_size]
-                    self.update_frequencies_from_samples_1d()
-                    self.update_needed = True
-                elif event.key == pg.K_i:
-                    self.show_imaginary = not self.show_imaginary
-                    self.update_needed = True
-                elif event.key == pg.K_0:
-                    self.samples = np.zeros((len(self.samples),), dtype=complex)
-                    self.update_frequencies_from_samples_1d()
-                    self.update_needed = True
-                elif event.key == pg.K_c:
-                    self.frequency += -1 if pg.key.get_mods() & pg.KMOD_SHIFT else 1
-                    space = np.linspace(0, 2.0*np.pi, len(self.samples), endpoint=False, dtype=complex)
-                    self.samples = np.cos(space * self.frequency) * 4.0
-                    self.update_frequencies_from_samples_1d()
-                    self.update_needed = True
-                elif event.key == pg.K_s:
-                    self.frequency += -1 if pg.key.get_mods() & pg.KMOD_SHIFT else 1
-                    space = np.linspace(0, 2.0 * np.pi, len(self.samples), endpoint=False, dtype=complex)
-                    self.samples = np.sin(space * self.frequency) * 4.0
-                    self.update_frequencies_from_samples_1d()
-                    self.update_needed = True
-        elif self.mode == '2':
-            if event.type == pg.MOUSEBUTTONDOWN:
-                self.flip_point(event.pos)
-                self.drawing = True
-            if event.type == pg.MOUSEBUTTONUP:
-                self.drawing = False
-                self.last_flipped_index = None
-            if event.type == pg.MOUSEMOTION:
-                if self.drawing:
-                    self.flip_point(event.pos, False)
-            if event.type == pg.KEYDOWN:
-                if event.unicode == 's':
-                    self.frequency_vert += 1
-                    print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
-                    self.generate_image_with_frequency()
-                elif event.unicode == 'S':
-                    self.frequency_vert -= 1
-                    print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
-                    self.generate_image_with_frequency()
-                if event.unicode == 'd':
-                    self.frequency_hori += 1
-                    print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
-                    self.generate_image_with_frequency()
-                elif event.unicode == 'D':
-                    self.frequency_hori -= 1
-                    print('freq_vert: ', self.frequency_vert, 'freq_hori', self.frequency_hori)
-                    self.generate_image_with_frequency()
-                elif event.unicode == 'i':
-                    self.space_image = self.image_loader.next_image()
-                    self.update_frequencies()
-                    self.update_needed = True
-                elif event.unicode == 'I':
-                    self.space_image = self.image_loader.prev_image()
-                    self.update_frequencies()
-                    self.update_needed = True
-                elif event.unicode == 'n':
-                    self.transform_index = (self.transform_index + 1) % len(TRANSFORMS)
-                    self.update_frequencies()
-                    self.update_needed = True
-                    print(f'Using {TRANSFORMS[self.transform_index]}')
-                elif event.key == 27:
-                    self.running = False
-            else:
+            elif event.key == pg.K_i:
+                self.show_imaginary = not self.show_imaginary
                 self.update_needed = True
-        elif self.mode == '1':
-            pass
-
-    def generate_image_with_frequency(self):
-        lin_space = np.linspace(0, 2 * np.pi, IMAGE_SIZE)\
-            .repeat(IMAGE_SIZE)\
-            .reshape(IMAGE_SIZE, IMAGE_SIZE)
-        space_image = np.sin(lin_space * self.frequency_vert) + np.sin(lin_space.T * self.frequency_hori)
-
-        self.space_image = (space_image + 1) / 2
-        self.update_frequencies()
-        self.update_needed = True
-
-    def flip_point(self, pos, choose_value=True):
-        rects = [IMAGE_RECT, FREQUENCY_IMAGE_RECT1, FREQUENCY_IMAGE_RECT2]
-        rect_index = -1
-        rect = None
-        for i, r in enumerate(rects):
-            if r.collidepoint(pos):
-                rect_index = i
-                rect = r
-                break
-        if rect is None:
-            return
-        rect_top_left = np.array(rect.topleft)
-        mouse_pos = np.array(pos)
-        index = ((mouse_pos - rect_top_left) * (IMAGE_SIZE / RENDER_SIZE)).astype(int)
-        index = tuple(np.minimum(np.maximum(index, 0), IMAGE_SIZE - 1))
-
-        flipped_index = (*index, rect_index)
-        if self.last_flipped_index == flipped_index:
-            return
-        self.last_flipped_index = flipped_index
-
-        # mutate image
-        if rect_index == 0:
-            if choose_value and abs(self.space_image[index]) < 0.00001:
-                self.space_image[index] = 1
-            else:
-                self.space_image[index] = 0
-        elif rect_index in (1, 2):
-            if choose_value and abs(self.frequency_space[index]) < 0.00001:
-                if self.transform_index == 0:
-                    self.frequency_space[index] = IMAGE_SIZE**2 + IMAGE_SIZE**2*1j
-                elif self.transform_index == 1:
-                    self.frequency_space[index] = IMAGE_SIZE ** 2
-                else:
-                    raise ValueError('Unknown transform with index: ', self.transform_index)
-            else:
-                self.frequency_space[index] = 0
-
-        if rect_index == 0:
-            self.update_frequencies()
-        elif rect_index in (1, 2):
-            self.update_space()
-        self.update_needed = True
-
-    def update_space(self):
-        if self.transform_index == 0:
-            space_image = ifft2(self.frequency_space)
-        elif self.transform_index == 1:
-            space_image = idct(self.frequency_space)
-        else:
-            raise ValueError('Unknown transform with index: ', self.transform_index)
-        self.space_image = (space_image + 1) / 2
-
-    def update_frequencies(self):
-        space_image = self.space_image * 2 - 1
-        if self.transform_index == 0:
-            self.frequency_space = fft2(space_image)
-        elif self.transform_index == 1:
-            self.frequency_space = dct(space_image)
-        else:
-            raise ValueError('Unknown transform with index: ', self.transform_index)
+            elif event.key == pg.K_0:
+                self.samples = np.zeros((len(self.samples),), dtype=complex)
+                self.update_frequencies_from_samples_1d()
+                self.update_needed = True
+            elif event.key == pg.K_c:
+                self.frequency += -1 if pg.key.get_mods() & pg.KMOD_SHIFT else 1
+                space = np.linspace(0, 2.0*np.pi, len(self.samples), endpoint=False, dtype=complex)
+                self.samples = np.cos(space * self.frequency) * 4.0
+                self.update_frequencies_from_samples_1d()
+                self.update_needed = True
+            elif event.key == pg.K_s:
+                self.frequency += -1 if pg.key.get_mods() & pg.KMOD_SHIFT else 1
+                space = np.linspace(0, 2.0 * np.pi, len(self.samples), endpoint=False, dtype=complex)
+                self.samples = np.sin(space * self.frequency) * 4.0
+                self.update_frequencies_from_samples_1d()
+                self.update_needed = True
 
 
 def image_from_np2d(a, scale_shape, normalize=False):
@@ -357,6 +196,7 @@ def main():
     pg.key.set_repeat(130, 25)
     main_instance = Main()
     if "pyodide" in sys.modules:
+        # noinspection PyUnresolvedReferences
         pg.event.register_event_callback(main_instance.handle_events)
         return main_instance
     else:
