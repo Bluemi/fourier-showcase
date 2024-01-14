@@ -40,16 +40,20 @@ class Main:
     def run(self):
         while self.running:
             events = [pg.event.wait()]
-            for event in events + pg.event.get():
-                self.handle_event(event)
-            if self.update_needed:
-                self.render()
-                self.update_needed = False
+            events = events + pg.event.get()
+            self.handle_events(events)
+
+    def handle_events(self, events):
+        for event in events:
+            self.handle_event(event)
+        if self.update_needed:
+            self.render()
+            self.update_needed = False
 
     def render(self):
         self.screen.fill(gray(80))
         self.render_1d()
-        pg.display.update()
+        pg.display.flip()
 
     def render_1d(self):
         # colors
@@ -193,7 +197,6 @@ def image_from_np2d(a, scale_shape, normalize=False):
 
 def main():
     pg.init()
-    pg.key.set_repeat(130, 25)
     main_instance = Main()
     if "pyodide" in sys.modules:
         # noinspection PyUnresolvedReferences
