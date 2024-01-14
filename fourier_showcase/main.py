@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import pygame as pg
 import numpy as np
 from scipy.fft import fft2, dct, idct, ifft2
@@ -355,7 +356,11 @@ def main():
     pg.init()
     pg.key.set_repeat(130, 25)
     main_instance = Main()
-    main_instance.run()
+    if "pyodide" in sys.modules:
+        pg.event.register_event_callback(main_instance.handle_events)
+        return main_instance
+    else:
+        main_instance.run()
 
 
 if __name__ == '__main__':
