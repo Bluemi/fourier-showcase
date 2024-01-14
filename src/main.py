@@ -32,6 +32,7 @@ class Main:
         # mode 1
         self.samples = np.zeros((10,), dtype=complex)
         self.spectrum = np.fft.fft(self.samples)
+        self.show_imaginary = False
 
         self.dragging = False
         self.last_mouse_button = None
@@ -61,7 +62,7 @@ class Main:
                 self.update_needed = False
 
     def render(self):
-        self.screen.fill(gray(127))
+        self.screen.fill(gray(80))
 
         if self.mode == '1':
             self.render_1d()
@@ -78,19 +79,26 @@ class Main:
         pg.display.update()
 
     def render_1d(self):
+        # colors
+        background_color = gray(40)
+        hline_color = gray(60)
+        real_color = pg.Color(40, 120, 250)
+        imag_color = pg.Color(210, 80, 20)
+
         # render samples
-        pg.draw.rect(self.screen, gray(70), IMAGE_RECT)  # draw background
+        pg.draw.rect(self.screen, background_color, IMAGE_RECT)  # draw background
         y_line = BORDER + RENDER_SIZE / 2  # y-pos of h-line
-        pg.draw.line(self.screen, gray(90), (BORDER, y_line), (BORDER+RENDER_SIZE, y_line))
-        self.draw_1d_samples(self.samples.real, BORDER, pg.Color(40, 100, 220))
-        self.draw_1d_samples(self.samples.imag, BORDER, pg.Color(220, 120, 40))
+        pg.draw.line(self.screen, hline_color, (BORDER, y_line), (BORDER+RENDER_SIZE, y_line))
+        if self.show_imaginary:
+            self.draw_1d_samples(self.samples.imag, BORDER, imag_color)
+        self.draw_1d_samples(self.samples.real, BORDER, real_color)
 
         # render real part
         left = FREQUENCY_IMAGE_RECT1.left
-        pg.draw.rect(self.screen, gray(70), FREQUENCY_IMAGE_RECT1)  # draw background
-        pg.draw.line(self.screen, gray(90), (left, y_line), (left+RENDER_SIZE, y_line))
-        self.draw_1d_samples(self.spectrum.real, left, pg.Color(40, 100, 220))
-        self.draw_1d_samples(self.spectrum.imag, left, pg.Color(220, 120, 40))
+        pg.draw.rect(self.screen, background_color, FREQUENCY_IMAGE_RECT1)  # draw background
+        pg.draw.line(self.screen, hline_color, (left, y_line), (left+RENDER_SIZE, y_line))
+        self.draw_1d_samples(self.spectrum.imag, left, imag_color)
+        self.draw_1d_samples(self.spectrum.real, left, real_color)
 
     def draw_1d_samples(self, samples, left, color):
         y_line = BORDER + RENDER_SIZE / 2  # y-pos of h-line
@@ -172,10 +180,17 @@ class Main:
                     self.samples = np.concatenate([self.samples, new_samples])
                     self.update_frequencies_from_samples_1d()
                     self.update_needed = True
-                if event.key == pg.K_MINUS:
+                elif event.key == pg.K_MINUS:
                     new_size = len(self.samples) * (1 / 1.2)
                     new_size = int(max(min(new_size, len(self.samples)-1), 1))
                     self.samples = self.samples[:new_size]
+                    self.update_frequencies_from_samples_1d()
+                    self.update_needed = True
+                elif event.key == pg.K_i:
+                    self.show_imaginary = not self.show_imaginary
+                    self.update_needed = True
+                elif event.key == pg.K_0:
+                    self.samples = np.zeros((len(self.samples),), dtype=complex)
                     self.update_frequencies_from_samples_1d()
                     self.update_needed = True
         elif self.mode == '2':
