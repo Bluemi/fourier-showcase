@@ -15,7 +15,7 @@ IMAGE_RECT = pg.Rect(BORDER, BORDER, RENDER_SIZE, RENDER_SIZE)
 FREQUENCY_IMAGE_RECT1 = IMAGE_RECT.move(RENDER_SIZE + BORDER, 0)
 FREQUENCY_IMAGE_RECT2 = FREQUENCY_IMAGE_RECT1.move(RENDER_SIZE + BORDER, 0)
 
-DEFAULT_SCREEN_SIZE = np.array([BORDER + (RENDER_SIZE + BORDER)*3 + BORDER, RENDER_SIZE+BORDER*2])
+DEFAULT_SCREEN_SIZE = np.array([BORDER + (RENDER_SIZE + BORDER)*2, RENDER_SIZE+BORDER*2])
 
 TRANSFORMS = ['fft', 'dct']
 
@@ -34,6 +34,7 @@ class Main:
         self.spectrum = np.fft.fft(self.samples)
 
         self.dragging = False
+        self.last_mouse_button = None
 
         # mode 2
         self.transform_index = 0
@@ -81,19 +82,15 @@ class Main:
         pg.draw.rect(self.screen, gray(70), IMAGE_RECT)  # draw background
         y_line = BORDER + RENDER_SIZE / 2  # y-pos of h-line
         pg.draw.line(self.screen, gray(90), (BORDER, y_line), (BORDER+RENDER_SIZE, y_line))
-        self.draw_1d_samples(self.samples.real, BORDER, gray(20))
+        self.draw_1d_samples(self.samples.real, BORDER, pg.Color(40, 100, 220))
+        self.draw_1d_samples(self.samples.imag, BORDER, pg.Color(220, 120, 40))
 
         # render real part
         left = FREQUENCY_IMAGE_RECT1.left
         pg.draw.rect(self.screen, gray(70), FREQUENCY_IMAGE_RECT1)  # draw background
         pg.draw.line(self.screen, gray(90), (left, y_line), (left+RENDER_SIZE, y_line))
-        self.draw_1d_samples(self.spectrum.real, left, gray(20))
-
-        # render imaginary part
-        left = FREQUENCY_IMAGE_RECT2.left
-        pg.draw.rect(self.screen, gray(70), FREQUENCY_IMAGE_RECT2)  # draw background
-        pg.draw.line(self.screen, gray(90), (left, y_line), (left+RENDER_SIZE, y_line))
-        self.draw_1d_samples(self.spectrum.imag, left, gray(20))
+        self.draw_1d_samples(self.spectrum.real, left, pg.Color(40, 100, 220))
+        self.draw_1d_samples(self.spectrum.imag, left, pg.Color(220, 120, 40))
 
     def draw_1d_samples(self, samples, left, color):
         y_line = BORDER + RENDER_SIZE / 2  # y-pos of h-line
@@ -119,16 +116,24 @@ class Main:
             return True
         return False
 
-    def handle_all_mouse_1d(self, pos):
-        if self.handle_mouse_1d(pos, IMAGE_RECT, self.samples.real):
+    def handle_all_mouse_1d(self, pos, button):
+        if button == 1:
+            samples_to_modify = self.samples.real
+        elif button == 3:
+            samples_to_modify = self.samples.imag
+        else:
+            return
+        if self.handle_mouse_1d(pos, IMAGE_RECT, samples_to_modify):
             self.update_frequencies_from_samples_1d()
             self.update_needed = True
 
-        if self.handle_mouse_1d(pos, FREQUENCY_IMAGE_RECT1, self.spectrum.real):
-            self.update_samples_from_frequencies_1d()
-            self.update_needed = True
-
-        if self.handle_mouse_1d(pos, FREQUENCY_IMAGE_RECT2, self.spectrum.imag):
+        if button == 1:
+            spectrum_to_modify = self.spectrum.real
+        elif button == 3:
+            spectrum_to_modify = self.spectrum.imag
+        else:
+            return
+        if self.handle_mouse_1d(pos, FREQUENCY_IMAGE_RECT1, spectrum_to_modify):
             self.update_samples_from_frequencies_1d()
             self.update_needed = True
 
@@ -151,12 +156,14 @@ class Main:
         if self.mode == '1':
             if event.type == pg.MOUSEBUTTONDOWN:
                 self.dragging = True
-                self.handle_all_mouse_1d(event.pos)
+                self.last_mouse_button = event.button
+                self.handle_all_mouse_1d(event.pos, event.button)
             elif event.type == pg.MOUSEBUTTONUP:
                 self.dragging = False
+                self.last_mouse_button = None
             elif event.type == pg.MOUSEMOTION:
                 if self.dragging:
-                    self.handle_all_mouse_1d(event.pos)
+                    self.handle_all_mouse_1d(event.pos, self.last_mouse_button)
             elif event.type == pg.KEYDOWN:
                 if event.key == pg.K_PLUS:
                     samples_to_add = int(round(len(self.samples) * 0.2))
