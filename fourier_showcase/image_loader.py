@@ -9,9 +9,15 @@ ALLOWED_FILE_TYPES = {'.png', '.jpg'}
 class ImageLoader:
     def __init__(self, image_size):
         self.image_index = 0
-        self.image_paths = [p for p in os.listdir('images') if os.path.splitext(p)[1] in ALLOWED_FILE_TYPES]
+        if os.path.isdir('images'):
+            self.image_paths = [p for p in os.listdir('images') if os.path.splitext(p)[1] in ALLOWED_FILE_TYPES]
+        else:
+            self.image_paths = []
         self.image_size = image_size
-        self.image = self.load_image()
+        if self.image_paths:
+            self.image = self.load_image()
+        else:
+            self.image = None
 
     def load_image(self):
         path = os.path.join('images', self.image_paths[self.image_index])

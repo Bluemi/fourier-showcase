@@ -34,7 +34,7 @@ class Main:
 
         # mode 1
         self.samples = np.zeros((10,), dtype=complex)
-        self.spectrum = np.fft.fft(self.samples)
+        self.spectrum = np.fft.fft(self.samples, norm='ortho')
 
         self.show_imaginary = False
         self.frequency = 0
@@ -153,10 +153,10 @@ class Main:
             self.update_needed = True
 
     def update_frequencies_from_samples_1d(self):
-        self.spectrum = np.fft.fft(self.samples)
+        self.spectrum = np.fft.fft(self.samples, norm='ortho')
 
     def update_samples_from_frequencies_1d(self):
-        self.samples = np.fft.ifft(self.spectrum)
+        self.samples = np.fft.ifft(self.spectrum, norm='ortho')
 
     def handle_event(self, event):
         if event.type == pg.QUIT:
@@ -317,9 +317,9 @@ class Main:
 
     def update_space(self):
         if self.transform_index == 0:
-            space_image = ifft2(self.frequency_space)
+            space_image = ifft2(self.frequency_space, norm='ortho')
         elif self.transform_index == 1:
-            space_image = idct(self.frequency_space)
+            space_image = idct(self.frequency_space, norm='ortho')
         else:
             raise ValueError('Unknown transform with index: ', self.transform_index)
         self.space_image = (space_image + 1) / 2
@@ -327,9 +327,9 @@ class Main:
     def update_frequencies(self):
         space_image = self.space_image * 2 - 1
         if self.transform_index == 0:
-            self.frequency_space = fft2(space_image)
+            self.frequency_space = fft2(space_image, norm='ortho')
         elif self.transform_index == 1:
-            self.frequency_space = dct(space_image)
+            self.frequency_space = dct(space_image, norm='ortho')
         else:
             raise ValueError('Unknown transform with index: ', self.transform_index)
 
